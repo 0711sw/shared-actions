@@ -1,0 +1,11 @@
+{
+  "name": "license-report-action",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "src/generate-licenses.mjs",
+  "license": "MIT",
+  "dependencies": {
+    "license-checker-rseidelsohn": "^4.4.2"
+  }
+}

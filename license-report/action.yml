@@ -1,0 +1,22 @@
+name: "Generate licenses.txt"
+description: "Generate a licenses.txt file from npm dependencies and an optional custom licenses.txt in the project root."
+author: "0711 Software GmbH"
+
+inputs:
+  project-root:
+    description: "Path to the project root (where package.json lives)."
+    required: false
+    default: "."
+
+runs:
+  using: "composite"
+  steps:
+    - name: Install action dependencies
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      run: npm ci
+
+    - name: Generate licenses.txt
+      shell: bash
+      working-directory: ${{ inputs.project-root }}
+      run: node "${{ github.action_path }}/src/generate-licenses.mjs"
