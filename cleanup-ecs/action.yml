@@ -1,0 +1,23 @@
+name: "Cleanup ECS Task Definitions"
+description: "Deregister old ECS task definition revisions, keeping the latest N"
+author: "0711 Software GmbH"
+
+inputs:
+  task-family:
+    description: "Task definition family"
+    required: true
+  keep:
+    description: "Number of revisions to keep"
+    required: false
+    default: "5"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Cleanup old Task Definitions
+      shell: bash
+      run: |
+        chmod +x "${{ github.action_path }}/cleanup-ecs.sh"
+        "${{ github.action_path }}/cleanup-ecs.sh" \
+          "${{ inputs.task-family }}" \
+          "${{ inputs.keep }}"

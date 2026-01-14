@@ -1,0 +1,34 @@
+name: "Deploy to ECS"
+description: "Update ECS service with a new task definition image"
+author: "0711 Software GmbH"
+
+inputs:
+  cluster:
+    description: "ECS cluster name"
+    required: true
+  service:
+    description: "ECS service name"
+    required: true
+  task-family:
+    description: "Task definition family"
+    required: true
+  repository:
+    description: "ECR repository name"
+    required: true
+  image-tag:
+    description: "Docker image tag"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Deploy to ECS
+      shell: bash
+      run: |
+        chmod +x "${{ github.action_path }}/deploy-ecs.sh"
+        "${{ github.action_path }}/deploy-ecs.sh" \
+          "${{ inputs.cluster }}" \
+          "${{ inputs.service }}" \
+          "${{ inputs.task-family }}" \
+          "${{ inputs.repository }}" \
+          "${{ inputs.image-tag }}"
