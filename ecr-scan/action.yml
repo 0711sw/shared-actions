@@ -1,0 +1,72 @@
+name: "ECR Vulnerability Scan"
+description: "Wait for ECR image scan and check for vulnerabilities"
+author: "0711 Software GmbH"
+
+inputs:
+  repository:
+    description: "ECR repository name"
+    required: true
+  image-tag:
+    description: "Image tag to scan"
+    required: true
+  fail-on-critical:
+    description: "Fail if critical vulnerabilities found"
+    required: false
+    default: "true"
+  fail-on-high:
+    description: "Fail if high vulnerabilities found"
+    required: false
+    default: "false"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Wait for ECR Image Scan
+      shell: bash
+      run: |
+        echo "Waiting for ECR image scan to complete..."
+        for i in {1..10}; do
+          STATUS=$(aws ecr describe-image-scan-findings \
+            --repository-name "${{ inputs.repository }}" \
+            --image-id imageTag="${{ inputs.image-tag }}" \
+            --query 'imageScanStatus.status' \
+            --output text 2>/dev/null | grep -Eom1 'COMPLETE|IN_PROGRESS' || echo "UNKNOWN")
+
+          if [[ "$STATUS" == "COMPLETE" ]]; then
+            echo "Scan completed."
+            break
+          fi
+
+          echo "Scan in progress... Retrying in 30 seconds..."
+          sleep 30
+        done
+
+    - name: Check for Vulnerabilities
+      shell: bash
+      run: |
+        HIGH_COUNT=$(aws ecr describe-image-scan-findings \
+          --repository-name "${{ inputs.repository }}" \
+          --image-id imageTag="${{ inputs.image-tag }}" \
+          --query 'imageScanFindings.findingSeverityCounts.HIGH' \
+          --output text 2>/dev/null | grep -Eo '[0-9]+' || echo 0)
+
+        CRITICAL_COUNT=$(aws ecr describe-image-scan-findings \
+          --repository-name "${{ inputs.repository }}" \
+          --image-id imageTag="${{ inputs.image-tag }}" \
+          --query 'imageScanFindings.findingSeverityCounts.CRITICAL' \
+          --output text 2>/dev/null | grep -Eo '[0-9]+' || echo 0)
+
+        echo "High vulnerabilities: $HIGH_COUNT"
+        echo "Critical vulnerabilities: $CRITICAL_COUNT"
+
+        if [[ "${{ inputs.fail-on-critical }}" == "true" && "$CRITICAL_COUNT" -gt 0 ]]; then
+          echo "Critical vulnerabilities found! Failing the build."
+          exit 1
+        fi
+
+        if [[ "${{ inputs.fail-on-high }}" == "true" && "$HIGH_COUNT" -gt 0 ]]; then
+          echo "High vulnerabilities found! Failing the build."
+          exit 1
+        fi
+
+        echo "Vulnerability check passed."

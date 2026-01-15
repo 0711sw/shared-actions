@@ -29,6 +29,32 @@ Deregisters old ECS task definition revisions, keeping the latest N.
     keep: 5  # optional, default: 5
 ```
 
+### short-sha
+
+Returns the short (7 character) commit SHA as an output.
+
+```yaml
+- name: Get short SHA
+  id: sha
+  uses: 0711sw/shared-actions/short-sha@main
+
+- name: Use it
+  run: echo "Short SHA is ${{ steps.sha.outputs.sha }}"
+```
+
+### ecr-scan
+
+Waits for ECR image scan to complete and checks for vulnerabilities.
+
+```yaml
+- uses: 0711sw/shared-actions/ecr-scan@main
+  with:
+    repository: my-org/my-repo
+    image-tag: abc1234
+    fail-on-critical: true   # optional, default: true
+    fail-on-high: false      # optional, default: false
+```
+
 ### license-report
 
 Generates a `dist/licenses.txt` file from npm dependencies. Optionally prepends a custom `licenses.txt` from the project root.

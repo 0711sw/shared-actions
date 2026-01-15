@@ -1,0 +1,16 @@
+name: "Short SHA"
+description: "Get the short (7 char) commit SHA"
+author: "0711 Software GmbH"
+
+outputs:
+  sha:
+    description: "The short commit SHA (7 characters)"
+    value: ${{ steps.sha.outputs.sha }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Get short SHA
+      id: sha
+      shell: bash
+      run: echo "sha=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
