@@ -1,0 +1,118 @@
+name: "Build Rust Docker Image"
+description: "Generate Dockerfile, build and push Rust application to ECR"
+author: "0711 Software GmbH"
+
+inputs:
+  app-name:
+    description: "Application name (used for binary and image)"
+    required: true
+  rust-version:
+    description: "Rust version for builder stage"
+    default: "1.92"
+  features:
+    description: "Cargo features to enable (comma-separated)"
+    default: "open_telemetry"
+  registry:
+    description: "ECR registry URL"
+    required: true
+  repository:
+    description: "ECR repository name"
+    required: true
+  image-tag:
+    description: "Docker image tag"
+    required: true
+  extra-env:
+    description: "Extra ENV lines for Dockerfile (one per line)"
+    default: ""
+
+runs:
+  using: "composite"
+  steps:
+    - name: Generate Dockerfile and entrypoint
+      shell: bash
+      env:
+        APP_NAME: ${{ inputs.app-name }}
+        RUST_VERSION: ${{ inputs.rust-version }}
+        FEATURES: ${{ inputs.features }}
+        EXTRA_ENV: ${{ inputs.extra-env }}
+      run: |
+        FEATURES_ARG=""
+        if [ -n "$FEATURES" ]; then
+          FEATURES_ARG="--features $FEATURES"
+        fi
+
+        # Rust crate names use underscores, not hyphens
+        CRATE_NAME="${APP_NAME//-/_}"
+
+        cat > Dockerfile <<EOF
+        FROM rust:${RUST_VERSION} AS builder
+        WORKDIR /app
+        COPY Cargo.toml Cargo.lock ./
+        COPY src ./src
+        RUN cargo build --release ${FEATURES_ARG}
+
+        FROM debian:trixie-slim
+        RUN apt-get update && apt-get install -y \\
+            libssl-dev \\
+            openssl \\
+            curl \\
+            jq \\
+            ca-certificates \\
+            && rm -rf /var/lib/apt/lists/*
+
+        RUN mkdir /app
+        COPY --from=builder /app/target/release/${APP_NAME} /app/${APP_NAME}
+        COPY docker-entrypoint.sh /app/docker-entrypoint.sh
+        RUN chmod +x /app/${APP_NAME} /app/docker-entrypoint.sh
+
+        ARG APP_VERSION="DEVELOPMENT-SNAPSHOT-VERSION"
+        ENV APP_NAME="${APP_NAME}"
+        ENV BIND_ADDRESS="0.0.0.0:8080"
+        ENV RUST_LOG="info"
+        ENV RUST_TRACE="warn,${CRATE_NAME}=debug,wasabi=debug"
+        ENV APP_VERSION=\$APP_VERSION
+        ${EXTRA_ENV}
+
+        EXPOSE 8080/tcp
+        WORKDIR /app
+        ENTRYPOINT ["/app/docker-entrypoint.sh"]
+        EOF
+
+        cat > docker-entrypoint.sh <<EOF
+        #!/bin/bash
+        set -e
+
+        export TASK_ID="unknown-task"
+        export NODE_ID="unknown-node"
+
+        if [ -n "\$ECS_CONTAINER_METADATA_URI_V4" ]; then
+            echo "Fetching ECS metadata..."
+            TASK_METADATA=\$(curl -s "\$ECS_CONTAINER_METADATA_URI_V4/task")
+            export TASK_ID=\$(echo "\$TASK_METADATA" | jq -r .TaskARN | awk -F'/' '{print \$NF}')
+            export NODE_ID=\$(echo "\$TASK_METADATA" | jq -r '.Containers[0].Networks[0].IPv4Addresses[0]')
+        fi
+
+        echo "Starting ${APP_NAME} in task: \$TASK_ID on node: \$NODE_ID"
+        exec /app/${APP_NAME}
+        EOF
+
+        chmod +x docker-entrypoint.sh
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build and Push Docker Image
+      shell: bash
+      env:
+        REGISTRY: ${{ inputs.registry }}
+        REPOSITORY: ${{ inputs.repository }}
+        IMAGE_TAG: ${{ inputs.image-tag }}
+      run: |
+        docker buildx build \
+          --build-arg APP_VERSION=$IMAGE_TAG \
+          --cache-from=type=gha \
+          --cache-to=type=gha,mode=max \
+          --push \
+          -t $REGISTRY/$REPOSITORY:$IMAGE_TAG \
+          -t $REGISTRY/$REPOSITORY:latest \
+          .
