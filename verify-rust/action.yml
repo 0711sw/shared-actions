@@ -1,0 +1,68 @@
+name: "Verify Rust Project"
+description: "Run fmt, clippy, build, and test inside a pinned Rust container"
+author: "0711 Software GmbH"
+
+inputs:
+  rust-version:
+    description: "Rust version (must match a rust: Docker image tag)"
+    default: "1.93"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Cache Cargo Dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: cargo-verify-${{ runner.os }}-${{ inputs.rust-version }}-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Check Formatting
+      shell: bash
+      run: |
+        docker run --rm \
+          -v "$GITHUB_WORKSPACE:/app" \
+          -v "$HOME/.cargo:/cargo-cache" \
+          -e CARGO_HOME=/cargo-cache \
+          -v "$GITHUB_WORKSPACE/target:/app/target" \
+          -w /app \
+          rust:${{ inputs.rust-version }} \
+          cargo fmt --check
+
+    - name: Run Clippy
+      shell: bash
+      run: |
+        docker run --rm \
+          -v "$GITHUB_WORKSPACE:/app" \
+          -v "$HOME/.cargo:/cargo-cache" \
+          -e CARGO_HOME=/cargo-cache \
+          -v "$GITHUB_WORKSPACE/target:/app/target" \
+          -w /app \
+          rust:${{ inputs.rust-version }} \
+          cargo clippy -- -D warnings
+
+    - name: Build Project
+      shell: bash
+      run: |
+        docker run --rm \
+          -v "$GITHUB_WORKSPACE:/app" \
+          -v "$HOME/.cargo:/cargo-cache" \
+          -e CARGO_HOME=/cargo-cache \
+          -v "$GITHUB_WORKSPACE/target:/app/target" \
+          -w /app \
+          rust:${{ inputs.rust-version }} \
+          cargo build
+
+    - name: Run Unit Tests
+      shell: bash
+      run: |
+        docker run --rm \
+          -v "$GITHUB_WORKSPACE:/app" \
+          -v "$HOME/.cargo:/cargo-cache" \
+          -e CARGO_HOME=/cargo-cache \
+          -v "$GITHUB_WORKSPACE/target:/app/target" \
+          -w /app \
+          rust:${{ inputs.rust-version }} \
+          cargo test
