@@ -19,7 +19,7 @@ runs:
           target
         key: cargo-verify-${{ runner.os }}-${{ inputs.rust-version }}-${{ hashFiles('**/Cargo.lock') }}
 
-    - name: Check Formatting
+    - name: Verify and Test
       shell: bash
       run: |
         docker run --rm \
@@ -29,40 +29,9 @@ runs:
           -v "$GITHUB_WORKSPACE/target:/app/target" \
           -w /app \
           rust:${{ inputs.rust-version }} \
-          cargo fmt --check
-
-    - name: Run Clippy
-      shell: bash
-      run: |
-        docker run --rm \
-          -v "$GITHUB_WORKSPACE:/app" \
-          -v "$HOME/.cargo:/cargo-cache" \
-          -e CARGO_HOME=/cargo-cache \
-          -v "$GITHUB_WORKSPACE/target:/app/target" \
-          -w /app \
-          rust:${{ inputs.rust-version }} \
-          cargo clippy -- -D warnings
-
-    - name: Build Project
-      shell: bash
-      run: |
-        docker run --rm \
-          -v "$GITHUB_WORKSPACE:/app" \
-          -v "$HOME/.cargo:/cargo-cache" \
-          -e CARGO_HOME=/cargo-cache \
-          -v "$GITHUB_WORKSPACE/target:/app/target" \
-          -w /app \
-          rust:${{ inputs.rust-version }} \
-          cargo build
-
-    - name: Run Unit Tests
-      shell: bash
-      run: |
-        docker run --rm \
-          -v "$GITHUB_WORKSPACE:/app" \
-          -v "$HOME/.cargo:/cargo-cache" \
-          -e CARGO_HOME=/cargo-cache \
-          -v "$GITHUB_WORKSPACE/target:/app/target" \
-          -w /app \
-          rust:${{ inputs.rust-version }} \
-          cargo test
+          bash -c "\
+            rustup component add rustfmt clippy && \
+            cargo fmt --check && \
+            cargo clippy -- -D warnings && \
+            cargo build && \
+            cargo test"
