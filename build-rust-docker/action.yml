@@ -114,5 +114,4 @@ runs:
           --cache-to=type=gha,mode=max \
           --push \
           -t $REGISTRY/$REPOSITORY:$IMAGE_TAG \
-          -t $REGISTRY/$REPOSITORY:latest \
           .
