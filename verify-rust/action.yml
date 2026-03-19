@@ -34,4 +34,6 @@ runs:
             cargo fmt --check && \
             cargo clippy -- -D warnings && \
             cargo build && \
-            cargo test"
+            cargo test && \
+            cargo install cargo-audit && \
+            cargo audit"
