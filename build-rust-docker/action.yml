@@ -49,7 +49,6 @@ runs:
         WORKDIR /app
         COPY Cargo.toml Cargo.lock ./
         COPY src ./src
-        RUN cargo install cargo-audit && cargo audit
         RUN cargo build --release ${FEATURES_ARG}
 
         FROM debian:trixie-slim
