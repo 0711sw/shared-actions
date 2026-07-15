@@ -24,6 +24,13 @@ inputs:
   extra-env:
     description: "Extra ENV lines for Dockerfile (one per line)"
     default: ""
+  extra-copy:
+    description: >
+      Extra project paths to COPY into the Docker builder stage before
+      the release build, one per line (e.g. "templates", "assets").
+      Needed when your crate references files outside src/ via
+      include_str!, include_bytes!, or build.rs.
+    default: ""
 
 runs:
   using: "composite"
@@ -35,11 +42,22 @@ runs:
         RUST_VERSION: ${{ inputs.rust-version }}
         FEATURES: ${{ inputs.features }}
         EXTRA_ENV: ${{ inputs.extra-env }}
+        EXTRA_COPY: ${{ inputs.extra-copy }}
       run: |
         FEATURES_ARG=""
         if [ -n "$FEATURES" ]; then
           FEATURES_ARG="--features $FEATURES"
         fi
+
+        # Emit one `COPY <path> ./<path>` per non-empty line of EXTRA_COPY.
+        EXTRA_COPY_LINES=""
+        while IFS= read -r path; do
+          path="${path#"${path%%[![:space:]]*}"}"
+          path="${path%"${path##*[![:space:]]}"}"
+          if [ -n "$path" ]; then
+            EXTRA_COPY_LINES+="COPY $path ./$path"$'\n'
+          fi
+        done <<< "$EXTRA_COPY"
 
         # Rust crate names use underscores, not hyphens
         CRATE_NAME="${APP_NAME//-/_}"
@@ -49,7 +67,7 @@ runs:
         WORKDIR /app
         COPY Cargo.toml Cargo.lock ./
         COPY src ./src
-        RUN cargo build --release ${FEATURES_ARG}
+        ${EXTRA_COPY_LINES}RUN cargo build --release ${FEATURES_ARG}
 
         FROM debian:trixie-slim
         RUN apt-get update && apt-get install -y \\
