@@ -6,6 +6,13 @@ inputs:
   rust-version:
     description: "Rust version (must match a rust: Docker image tag)"
     default: "1.97.0"
+  audit-ignore:
+    description: >
+      Comma or newline separated list of RustSec advisory IDs to ignore
+      when running cargo audit (e.g. "RUSTSEC-2026-0194,RUSTSEC-2026-0195").
+      Use only for advisories that are transitive, non-exploitable in your
+      usage, and blocked on an upstream fix.
+    default: ""
 
 runs:
   using: "composite"
@@ -21,7 +28,17 @@ runs:
 
     - name: Verify and Test
       shell: bash
+      env:
+        AUDIT_IGNORE: ${{ inputs.audit-ignore }}
       run: |
+        # Build cargo-audit --ignore flags from AUDIT_IGNORE (comma or newline separated).
+        AUDIT_FLAGS=""
+        for id in $(echo "$AUDIT_IGNORE" | tr ',\n' ' '); do
+          if [ -n "$id" ]; then
+            AUDIT_FLAGS="$AUDIT_FLAGS --ignore $id"
+          fi
+        done
+
         docker run --rm \
           -v "$GITHUB_WORKSPACE:/app" \
           -v "$HOME/.cargo:/cargo-cache" \
@@ -36,4 +53,4 @@ runs:
             cargo build && \
             cargo test && \
             cargo install cargo-audit && \
-            cargo audit"
+            cargo audit $AUDIT_FLAGS"
