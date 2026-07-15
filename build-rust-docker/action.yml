@@ -8,7 +8,7 @@ inputs:
     required: true
   rust-version:
     description: "Rust version for builder stage"
-    default: "1.95.0"
+    default: "1.97.0"
   features:
     description: "Cargo features to enable (comma-separated)"
     default: "open_telemetry"
